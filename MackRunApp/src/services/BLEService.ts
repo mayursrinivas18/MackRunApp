@@ -40,6 +40,7 @@ class BLEService {
   private onDataCallback: EMGDataCallback | null = null;
   private onStatusCallback: StatusCallback | null = null;
   private scanTimeout: ReturnType<typeof setTimeout> | null = null;
+  private mockMode = false;
 
   constructor() {
     this.manager = new BleManager();
@@ -239,6 +240,7 @@ class BLEService {
 
   // Send control command to device (start/stop session)
   async sendCommand(command: 'START' | 'STOP' | 'CALIBRATE'): Promise<void> {
+    if (this.mockMode) return;
     if (!this.connectedDevice) throw new Error('No device connected');
 
     const commandMap: Record<string, number> = {
@@ -300,6 +302,20 @@ class BLEService {
   destroy(): void {
     this.disconnect();
     this.manager.destroy();
+  }
+
+  // ─── Test-only hooks — let a mock device feed the same pipeline a real
+  // device's BLE notifications use, without touching any real BLE state. ──
+  setMockMode(enabled: boolean): void {
+    this.mockMode = enabled;
+  }
+
+  simulateData(data: EMGData): void {
+    this.emitData(data);
+  }
+
+  simulateStatus(status: ConnectionStatus): void {
+    this.updateStatus(status);
   }
 }
 

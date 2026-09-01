@@ -27,7 +27,8 @@ export const EMG_CONFIG = {
   SAMPLE_RATE: 1000,        // Hz — matches your ESP32 ADC sample rate
   DISPLAY_UPDATE_RATE: 20,  // Hz — chart update rate
   RMS_WINDOW_SIZE: 50,      // samples for RMS calculation
-  FATIGUE_THRESHOLD: 0.75,  // 0-1 scale, above this triggers fatigue alert
+  WARNING_THRESHOLD: 0.5,   // 0-1 scale, above this = yellow (precursors flagged)
+  FATIGUE_THRESHOLD: 0.75,  // 0-1 scale, above this = red (triggers fatigue alert)
   MVC_DEFAULT: 1000,        // default max voluntary contraction reference
 };
 

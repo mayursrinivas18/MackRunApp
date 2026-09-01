@@ -11,6 +11,7 @@ import { firebaseService } from '../services/FirebaseService';
 import { bleService } from '../services/BLEService';
 import { EMGData } from '../services/BLEService';
 import { THEME, EMG_CONFIG } from '../config/firebase';
+import FatigueGauge from '../components/FatigueGauge';
 import {
   getFatigueColour,
   formatSessionTime,
@@ -202,14 +203,6 @@ export default function LiveSessionScreen() {
         <View style={styles.chartSection}>
           <View style={styles.chartHeader}>
             <Text style={styles.chartTitle}>Medial Gastrocnemius</Text>
-            <View style={[
-              styles.fatiguePill,
-              { backgroundColor: getFatigueColour(mgFatigue) + '30' }
-            ]}>
-              <Text style={[styles.fatigueText, { color: getFatigueColour(mgFatigue) }]}>
-                {Math.round(mgFatigue * 100)}% fatigue
-              </Text>
-            </View>
           </View>
           <LineChart
             data={{
@@ -234,20 +227,13 @@ export default function LiveSessionScreen() {
             withXLabels={false}
             style={styles.chart}
           />
+          <FatigueGauge value={mgFatigue} title="Precursor Level" />
         </View>
 
         {/* TA Chart */}
         <View style={styles.chartSection}>
           <View style={styles.chartHeader}>
             <Text style={styles.chartTitle}>Tibialis Anterior</Text>
-            <View style={[
-              styles.fatiguePill,
-              { backgroundColor: getFatigueColour(taFatigue) + '30' }
-            ]}>
-              <Text style={[styles.fatigueText, { color: getFatigueColour(taFatigue) }]}>
-                {Math.round(taFatigue * 100)}% fatigue
-              </Text>
-            </View>
           </View>
           <LineChart
             data={{
@@ -272,6 +258,7 @@ export default function LiveSessionScreen() {
             withXLabels={false}
             style={styles.chart}
           />
+          <FatigueGauge value={taFatigue} title="Precursor Level" />
         </View>
 
         {/* Live metrics */}
