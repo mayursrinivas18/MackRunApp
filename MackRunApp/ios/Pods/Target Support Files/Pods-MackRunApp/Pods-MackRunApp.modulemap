@@ -1,0 +1,6 @@
+module Pods_MackRunApp {
+  umbrella header "Pods-MackRunApp-umbrella.h"
+
+  export *
+  module * { export * }
+}

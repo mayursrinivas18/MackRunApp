@@ -1,0 +1,6 @@
+module Pods_MackRunApp_MackRunAppTests {
+  umbrella header "Pods-MackRunApp-MackRunAppTests-umbrella.h"
+
+  export *
+  module * { export * }
+}
