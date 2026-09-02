@@ -99,6 +99,56 @@ export default function LiveSessionScreen() {
     bleService.onData(handleEMGData);
   }, [handleEMGData]);
 
+  // Saves the session and returns to the previous screen. Shared by the
+  // manual "Stop Session" button and by a device (real or mock) signalling
+  // on its own that the session has ended, so a session is captured to
+  // History either way, regardless of how it stopped.
+  const finishSession = useCallback(async () => {
+    if (!isRecording) return;
+
+    setIsRecording(false);
+    if (timerRef.current) clearInterval(timerRef.current);
+    await bleService.sendCommand('STOP');
+
+    // Calculate averages
+    const sd = sessionDataRef.current;
+    const avgMGFatigue = sd.mgFatigueHistory.length > 0
+      ? sd.mgFatigueHistory.reduce((a, b) => a + b, 0) / sd.mgFatigueHistory.length
+      : 0;
+    const avgTAFatigue = sd.taFatigueHistory.length > 0
+      ? sd.taFatigueHistory.reduce((a, b) => a + b, 0) / sd.taFatigueHistory.length
+      : 0;
+
+    // Save session
+    if (state.user) {
+      await firebaseService.saveSession({
+        athleteId: state.user.uid,
+        athleteName: state.user.name,
+        startTime: sessionStartRef.current,
+        endTime: Date.now(),
+        duration: sessionTime,
+        peakMGRMS: sd.peakMGRMS,
+        peakTARMS: sd.peakTARMS,
+        avgMGFatigue,
+        avgTAFatigue,
+        fatigueOnsetTime: null,
+        coActivationRatio: EMGProcessor.calculateCoActivation(
+          sd.peakMGRMS,
+          sd.peakTARMS
+        ),
+        notes: '',
+      });
+
+      await firebaseService.clearLiveData(state.user.uid);
+    }
+
+    navigation.goBack();
+  }, [isRecording, sessionTime, state.user, navigation]);
+
+  useEffect(() => {
+    bleService.onSessionComplete(finishSession);
+  }, [finishSession]);
+
   const startSession = async () => {
     try {
       await bleService.sendCommand('START');
@@ -121,54 +171,12 @@ export default function LiveSessionScreen() {
     }
   };
 
-  const stopSession = async () => {
+  const stopSession = () => {
     if (!isRecording) return;
 
     Alert.alert('Stop Session', 'End this session?', [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Stop',
-        style: 'destructive',
-        onPress: async () => {
-          setIsRecording(false);
-          if (timerRef.current) clearInterval(timerRef.current);
-          await bleService.sendCommand('STOP');
-
-          // Calculate averages
-          const sd = sessionDataRef.current;
-          const avgMGFatigue = sd.mgFatigueHistory.length > 0
-            ? sd.mgFatigueHistory.reduce((a, b) => a + b, 0) / sd.mgFatigueHistory.length
-            : 0;
-          const avgTAFatigue = sd.taFatigueHistory.length > 0
-            ? sd.taFatigueHistory.reduce((a, b) => a + b, 0) / sd.taFatigueHistory.length
-            : 0;
-
-          // Save session
-          if (state.user) {
-            await firebaseService.saveSession({
-              athleteId: state.user.uid,
-              athleteName: state.user.name,
-              startTime: sessionStartRef.current,
-              endTime: Date.now(),
-              duration: sessionTime,
-              peakMGRMS: sd.peakMGRMS,
-              peakTARMS: sd.peakTARMS,
-              avgMGFatigue,
-              avgTAFatigue,
-              fatigueOnsetTime: null,
-              coActivationRatio: EMGProcessor.calculateCoActivation(
-                sd.peakMGRMS,
-                sd.peakTARMS
-              ),
-              notes: '',
-            });
-
-            await firebaseService.clearLiveData(state.user.uid);
-          }
-
-          navigation.goBack();
-        },
-      },
+      { text: 'Stop', style: 'destructive', onPress: finishSession },
     ]);
   };
 

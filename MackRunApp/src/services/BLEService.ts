@@ -41,6 +41,8 @@ class BLEService {
   private onStatusCallback: StatusCallback | null = null;
   private scanTimeout: ReturnType<typeof setTimeout> | null = null;
   private mockMode = false;
+  private mockCommandCallback: ((command: 'START' | 'STOP' | 'CALIBRATE') => void) | null = null;
+  private onSessionCompleteCallback: (() => void) | null = null;
 
   constructor() {
     this.manager = new BleManager();
@@ -240,7 +242,10 @@ class BLEService {
 
   // Send control command to device (start/stop session)
   async sendCommand(command: 'START' | 'STOP' | 'CALIBRATE'): Promise<void> {
-    if (this.mockMode) return;
+    if (this.mockMode) {
+      this.mockCommandCallback?.(command);
+      return;
+    }
     if (!this.connectedDevice) throw new Error('No device connected');
 
     const commandMap: Record<string, number> = {
@@ -308,6 +313,24 @@ class BLEService {
   // device's BLE notifications use, without touching any real BLE state. ──
   setMockMode(enabled: boolean): void {
     this.mockMode = enabled;
+  }
+
+  // Lets a mock device react to sendCommand('STOP') etc. from the real UI
+  // (e.g. the "Stop Session" button), which is otherwise a no-op in mock mode.
+  onMockCommand(callback: (command: 'START' | 'STOP' | 'CALIBRATE') => void): void {
+    this.mockCommandCallback = callback;
+  }
+
+  // Lets the active screen finish + save a session the same way "Stop
+  // Session" does, even when nobody tapped it — e.g. a mock session running
+  // out its configured duration on its own, or (for real hardware) a device
+  // signalling it ended the session itself.
+  onSessionComplete(callback: () => void): void {
+    this.onSessionCompleteCallback = callback;
+  }
+
+  simulateSessionComplete(): void {
+    this.onSessionCompleteCallback?.();
   }
 
   simulateData(data: EMGData): void {

@@ -56,6 +56,11 @@ export function startMockSession(
 
   bleService.setMockMode(true);
   bleService.simulateStatus('connected');
+  // So tapping "Stop Session" in the real UI actually stops this timer,
+  // instead of the mock just running for its full configured duration.
+  bleService.onMockCommand(command => {
+    if (command === 'STOP') stopMockSession();
+  });
 
   console.log(
     `[mock_device] session started — quality=${quality} duration=${(durationMs / 60000).toFixed(1)}min`
@@ -96,6 +101,9 @@ export function startMockSession(
 
     if (progress >= 1) {
       stopMockSession();
+      // Session ran its full course without anyone tapping "Stop" — make
+      // sure it still gets saved to History instead of just vanishing.
+      bleService.simulateSessionComplete();
     }
   }, SAMPLE_INTERVAL_MS);
 }
@@ -108,5 +116,5 @@ if (__DEV__) {
   // the debugger console. First number is quality 0-100, second is minutes.
   // Delayed so the app's own connection-status listener is mounted first —
   // firing this at module-load time is too early and the event is lost.
-  setTimeout(() => startMockSession(50, 7), 1000);
+  setTimeout(() => startMockSession(10, 3), 1000);
 }
