@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  SafeAreaView, ActivityIndicator, RefreshControl,
+  SafeAreaView, ActivityIndicator, RefreshControl, Clipboard,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -27,43 +27,67 @@ export default function CoachDashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [alerts, setAlerts] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [joinCode, setJoinCode] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const unsubscribeRefs = React.useRef<Map<string, () => void>>(new Map());
+
+  const copyJoinCode = () => {
+    if (!joinCode) return;
+    Clipboard.setString(joinCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  useEffect(() => {
+    if (state.user) {
+      firebaseService.getOrCreateJoinCode(state.user.uid)
+        .then(setJoinCode)
+        .catch(err => console.error('[CoachDashboardScreen] failed to get join code:', err));
+    }
+  }, [state.user]);
 
   const loadAthletes = async () => {
     if (!state.user) return;
+    setError(null);
 
-    const profiles = await firebaseService.getCoachAthletes(state.user.uid);
-    const unreadAlerts = await firebaseService.getUnreadAlerts(state.user.uid);
-    setAlerts(unreadAlerts);
+    try {
+      const profiles = await firebaseService.getCoachAthletes(state.user.uid);
+      const unreadAlerts = await firebaseService.getUnreadAlerts(state.user.uid);
+      setAlerts(unreadAlerts);
 
-    // Set up real-time subscriptions for each athlete
-    const athleteCards: AthleteCard[] = profiles.map(profile => ({
-      profile,
-      liveData: null,
-      unsubscribe: null,
-    }));
+      // Set up real-time subscriptions for each athlete
+      const athleteCards: AthleteCard[] = profiles.map(profile => ({
+        profile,
+        liveData: null,
+        unsubscribe: null,
+      }));
 
-    setAthletes(athleteCards);
+      setAthletes(athleteCards);
 
-    // Subscribe to live data for each athlete
-    profiles.forEach(profile => {
-      const unsubscribe = firebaseService.subscribeLiveData(
-        profile.uid,
-        (liveData) => {
-          setAthletes(prev =>
-            prev.map(a =>
-              a.profile.uid === profile.uid
-                ? { ...a, liveData }
-                : a
-            )
-          );
-        }
-      );
-      unsubscribeRefs.current.set(profile.uid, unsubscribe);
-    });
-
-    setLoading(false);
-    setRefreshing(false);
+      // Subscribe to live data for each athlete
+      profiles.forEach(profile => {
+        const unsubscribe = firebaseService.subscribeLiveData(
+          profile.uid,
+          (liveData) => {
+            setAthletes(prev =>
+              prev.map(a =>
+                a.profile.uid === profile.uid
+                  ? { ...a, liveData }
+                  : a
+              )
+            );
+          }
+        );
+        unsubscribeRefs.current.set(profile.uid, unsubscribe);
+      });
+    } catch (err: any) {
+      console.error('[CoachDashboardScreen] failed to load athletes:', err);
+      setError(err?.message || 'Failed to load athletes');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
   useEffect(() => {
@@ -88,6 +112,33 @@ export default function CoachDashboardScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <ActivityIndicator color={THEME.primary} size="large" style={{ marginTop: 40 }} />
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.empty}>
+          <Text style={styles.emptyTitle}>No Athletes</Text>
+          <Text style={styles.emptySubtitle}>
+            There are no athletes on your team yet. Add them from Settings.
+          </Text>
+          <TouchableOpacity style={styles.coachIdCard} onPress={copyJoinCode} disabled={!joinCode} activeOpacity={0.7}>
+            <Text style={styles.coachIdLabel}>Your Coach Code</Text>
+            {joinCode ? (
+              <>
+                <Text style={styles.coachIdValue}>{joinCode}</Text>
+                <Text style={styles.copyHint}>{copied ? 'Copied!' : 'Tap to copy'}</Text>
+              </>
+            ) : (
+              <ActivityIndicator color={THEME.primary} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.retryBtn} onPress={loadAthletes}>
+            <Text style={styles.retryBtnText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
@@ -136,14 +187,21 @@ export default function CoachDashboardScreen() {
         }
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>No athletes yet</Text>
+            <Text style={styles.emptyTitle}>No Athletes</Text>
             <Text style={styles.emptySubtitle}>
-              Share your coach ID with athletes to connect
+              Have your athletes enter your code below in Settings → Connect to Coach
             </Text>
-            <View style={styles.coachIdCard}>
-              <Text style={styles.coachIdLabel}>Your Coach ID</Text>
-              <Text style={styles.coachIdValue}>{state.user?.uid?.slice(0, 8).toUpperCase()}</Text>
-            </View>
+            <TouchableOpacity style={styles.coachIdCard} onPress={copyJoinCode} disabled={!joinCode} activeOpacity={0.7}>
+              <Text style={styles.coachIdLabel}>Your Coach Code</Text>
+              {joinCode ? (
+                <>
+                  <Text style={styles.coachIdValue}>{joinCode}</Text>
+                  <Text style={styles.copyHint}>{copied ? 'Copied!' : 'Tap to copy'}</Text>
+                </>
+              ) : (
+                <ActivityIndicator color={THEME.primary} />
+              )}
+            </TouchableOpacity>
           </View>
         }
         renderItem={({ item }) => (
@@ -272,7 +330,7 @@ const styles = StyleSheet.create({
   livePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FF4D0020',
+    backgroundColor: '#25A6D720',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 10,
@@ -296,6 +354,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: THEME.primary,
   },
+  retryBtn: {
+    marginTop: 20,
+    backgroundColor: THEME.primary,
+    borderRadius: 10,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  retryBtnText: { fontSize: 14, fontWeight: '800', color: '#000' },
   coachIdLabel: { fontSize: 11, color: THEME.textSecondary, letterSpacing: 2, marginBottom: 6 },
-  coachIdValue: { fontSize: 20, fontWeight: '900', color: THEME.primary, letterSpacing: 3 },
+  coachIdValue: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: THEME.primary,
+    letterSpacing: 5,
+    textAlign: 'center',
+  },
+  copyHint: {
+    fontSize: 11,
+    color: THEME.textSecondary,
+    marginTop: 6,
+  },
 });

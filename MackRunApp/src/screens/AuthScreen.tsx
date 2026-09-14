@@ -1,7 +1,7 @@
 // src/screens/AuthScreen.tsx
 import React, { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  View, Text, Image, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator,
 } from 'react-native';
 import { firebaseService } from '../services/FirebaseService';
@@ -54,8 +54,11 @@ export default function AuthScreen() {
 
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.accentBar} />
-          <Text style={styles.brand}>MACKRUN</Text>
+          <Image
+            source={require('../assets/MackRunClearLogo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <Text style={styles.tagline}>Achilles Intelligence</Text>
         </View>
 
@@ -162,19 +165,15 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 48,
+    alignItems: 'center',
   },
-  accentBar: {
-    width: 40,
-    height: 4,
-    backgroundColor: THEME.primary,
-    marginBottom: 16,
-  },
-  brand: {
-    fontSize: 36,
-    fontWeight: '900',
-    color: THEME.text,
-    letterSpacing: 6,
-    marginBottom: 4,
+  logo: {
+    width: 300,
+    height: 300,
+    // The source image has ~22% of its height as transparent padding below
+    // the visible mark, so a negative margin is needed to actually tighten
+    // the gap to the tagline below it.
+    marginBottom: -55,
   },
   tagline: {
     fontSize: 13,
@@ -240,7 +239,7 @@ const styles = StyleSheet.create({
   },
   roleBtnActive: {
     borderColor: THEME.primary,
-    backgroundColor: '#FF4D0015',
+    backgroundColor: '#25A6D715',
   },
   roleBtnText: {
     color: THEME.textSecondary,

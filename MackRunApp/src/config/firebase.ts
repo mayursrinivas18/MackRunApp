@@ -32,14 +32,14 @@ export const EMG_CONFIG = {
   MVC_DEFAULT: 1000,        // default max voluntary contraction reference
 };
 
-// App theme
+// App theme — colours sampled directly from MackRunLogo.png
 export const THEME = {
-  background: '#000000',
-  surface: '#111111',
-  primary: '#FF4D00',
+  background: '#0A0D0F',
+  surface: '#12181B',
+  primary: '#25A6D7',
   text: '#FFFFFF',
   textSecondary: '#888888',
-  border: '#1A1A1A',
+  border: '#1E262A',
   success: '#00C853',
   warning: '#FFD600',
   danger: '#FF1744',

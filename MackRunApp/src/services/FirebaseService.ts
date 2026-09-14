@@ -13,7 +13,19 @@ export interface UserProfile {
   name: string;
   athleteIds?: string[];   // for coaches — list of athletes they manage
   coachId?: string;        // for athletes — their assigned coach
+  joinCode?: string;       // for coaches — short code athletes use to connect
   createdAt: number;
+}
+
+// Short, human-typeable codes — excludes 0/O/1/I/L to avoid ambiguity.
+const JOIN_CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+function generateJoinCode(length: number = 6): string {
+  let code = '';
+  for (let i = 0; i < length; i++) {
+    code += JOIN_CODE_CHARS[Math.floor(Math.random() * JOIN_CODE_CHARS.length)];
+  }
+  return code;
 }
 
 export interface Session {
@@ -99,6 +111,40 @@ class FirebaseService {
 
   async updateUserProfile(uid: string, updates: Partial<UserProfile>): Promise<void> {
     await firestore().collection('users').doc(uid).update(updates);
+  }
+
+  // Coach: fetch their short join code, generating and persisting one the
+  // first time (e.g. for accounts created before join codes existed).
+  // Lives directly on the coach's own user doc — no separate collection.
+  async getOrCreateJoinCode(coachId: string): Promise<string> {
+    const coachDoc = await firestore().collection('users').doc(coachId).get();
+    const existing = coachDoc.data()?.joinCode;
+    if (existing) return existing;
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const code = generateJoinCode();
+      const taken = await firestore()
+        .collection('users')
+        .where('joinCode', '==', code)
+        .limit(1)
+        .get();
+      if (!taken.empty) continue;
+
+      await firestore().collection('users').doc(coachId).update({ joinCode: code });
+      return code;
+    }
+
+    throw new Error('Could not generate a join code — please try again');
+  }
+
+  // Athlete: resolve a short join code back to the coach's actual uid
+  async resolveJoinCode(code: string): Promise<string | null> {
+    const snapshot = await firestore()
+      .collection('users')
+      .where('joinCode', '==', code.trim().toUpperCase())
+      .limit(1)
+      .get();
+    return snapshot.empty ? null : snapshot.docs[0].id;
   }
 
   // Coach links athlete to their dashboard

@@ -116,5 +116,5 @@ if (__DEV__) {
   // the debugger console. First number is quality 0-100, second is minutes.
   // Delayed so the app's own connection-status listener is mounted first —
   // firing this at module-load time is too early and the event is lost.
-  setTimeout(() => startMockSession(10, 3), 1000);
+  setTimeout(() => startMockSession(57, 3), 1000);
 }

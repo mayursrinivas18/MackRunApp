@@ -1,8 +1,8 @@
 // src/screens/SettingsScreen.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  SafeAreaView, Alert, TextInput,
+  SafeAreaView, Alert, TextInput, ActivityIndicator, Clipboard,
 } from 'react-native';
 import { useApp } from '../context/AppContext';
 import { firebaseService } from '../services/FirebaseService';
@@ -12,6 +12,23 @@ export default function SettingsScreen() {
   const { state, signOut } = useApp();
   const [coachCode, setCoachCode] = useState('');
   const [linking, setLinking] = useState(false);
+  const [joinCode, setJoinCode] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const copyJoinCode = () => {
+    if (!joinCode) return;
+    Clipboard.setString(joinCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  useEffect(() => {
+    if (state.user?.role === 'coach') {
+      firebaseService.getOrCreateJoinCode(state.user.uid)
+        .then(setJoinCode)
+        .catch(err => console.error('[SettingsScreen] failed to get join code:', err));
+    }
+  }, [state.user]);
 
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -24,11 +41,16 @@ export default function SettingsScreen() {
     if (!coachCode.trim() || !state.user) return;
     setLinking(true);
     try {
-      await firebaseService.linkAthleteToCoach(state.user.uid, coachCode.trim());
+      const coachId = await firebaseService.resolveJoinCode(coachCode.trim());
+      if (!coachId) {
+        Alert.alert('Error', 'Could not find a coach with that code');
+        return;
+      }
+      await firebaseService.linkAthleteToCoach(state.user.uid, coachId);
       Alert.alert('Success', 'Connected to your coach');
       setCoachCode('');
     } catch (error) {
-      Alert.alert('Error', 'Could not find coach with that ID');
+      Alert.alert('Error', 'Could not connect to coach');
     } finally {
       setLinking(false);
     }
@@ -69,16 +91,17 @@ export default function SettingsScreen() {
             ) : (
               <View style={styles.linkCard}>
                 <Text style={styles.linkDescription}>
-                  Enter your coach's ID to share your session data with them in real time.
+                  Enter your coach's code to share your session data with them in real time.
                 </Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Coach ID"
+                  placeholder="Coach Code"
                   placeholderTextColor={THEME.textSecondary}
                   value={coachCode}
                   onChangeText={setCoachCode}
-                  autoCapitalize="none"
+                  autoCapitalize="characters"
                   autoCorrect={false}
+                  maxLength={6}
                 />
                 <TouchableOpacity
                   style={[styles.linkBtn, (!coachCode || linking) && styles.linkBtnDisabled]}
@@ -93,19 +116,28 @@ export default function SettingsScreen() {
           </View>
         )}
 
-        {/* Coach: share ID */}
+        {/* Coach: share code */}
         {state.user?.role === 'coach' && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>YOUR COACH ID</Text>
+            <Text style={styles.sectionTitle}>YOUR COACH CODE</Text>
             <View style={styles.coachIdCard}>
               <Text style={styles.coachIdDescription}>
-                Share this ID with your athletes so they can connect to you.
+                Share this code with your athletes — they enter it under Connect to Coach.
               </Text>
-              <View style={styles.coachIdBox}>
-                <Text style={styles.coachIdValue}>
-                  {state.user?.uid?.slice(0, 8).toUpperCase()}
-                </Text>
-              </View>
+              <TouchableOpacity
+                style={styles.coachIdBox}
+                onPress={copyJoinCode}
+                disabled={!joinCode}
+                activeOpacity={0.7}>
+                {joinCode ? (
+                  <>
+                    <Text style={styles.coachIdValue}>{joinCode}</Text>
+                    <Text style={styles.copyHint}>{copied ? 'Copied!' : 'Tap to copy'}</Text>
+                  </>
+                ) : (
+                  <ActivityIndicator color={THEME.primary} />
+                )}
+              </TouchableOpacity>
             </View>
           </View>
         )}
@@ -235,7 +267,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: THEME.primary,
   },
-  coachIdValue: { fontSize: 22, fontWeight: '900', color: THEME.primary, letterSpacing: 4 },
+  coachIdValue: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: THEME.primary,
+    letterSpacing: 5,
+    textAlign: 'center',
+  },
+  copyHint: {
+    fontSize: 11,
+    color: THEME.textSecondary,
+    marginTop: 6,
+  },
   infoCard: {
     backgroundColor: THEME.surface,
     borderRadius: 10,
